@@ -1,0 +1,7 @@
+setting.json
+.vscode
+*.cmd
+*.ko
+*.mod
+*.o
+*.order
