@@ -1,7 +1,7 @@
 
 
 
-CFLAGS += -Wall -Wextra -Wpedantic -Wmissing-prototypes -Wredundant-decls \
+CFLAGS += -g -Wall -Wextra -Wpedantic -Wmissing-prototypes -Wredundant-decls \
 	-Wshadow -Wno-unused-result \
 	-mtune=native -mcpu=native -O3
 

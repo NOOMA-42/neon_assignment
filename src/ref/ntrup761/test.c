@@ -58,6 +58,7 @@ int main(void){
     int16_t src1[NTRUP_P];
     int8_t  src2[NTRUP_P];
     int16_t des[NTRUP_P];
+    int16_t fft_res[NTRUP_P];
 
     for(size_t i = 0; i < ITERATIONS; i++){
 
@@ -69,14 +70,28 @@ int main(void){
         schoolbook(ref, src1, src2);
         poly_Rq_mul_small(des, src1, src2);
 
-        for(size_t j = 0; j < NTRUP_P; j++){
+        for(size_t j = 0; j < NTRUP_P; j++)
             assert(ref[j] == des[j]);
-	}
-
     }
-
     printf("poly_Rq_mul_small finished!\n");
 
+
+    
+    printf("fft unit test finished\n");
+
+
+    for(size_t i = 0; i < ITERATIONS; i++){
+        for(size_t j = 0; j < NTRUP_P; j++){
+            src1[j] = cmod(rand(), NTRUP_Q);
+	    src2[j] = cmod(rand(), 3);
+	}
+        schoolbook(ref, src1, src2);
+        fft_poly_mul(fft_res, src1, src2);
+
+        for(size_t j = 0; j < NTRUP_P; j++)
+            assert(ref[j] == fft_res[j]);
+    }
+    printf("fft_poly_mul finished!\n");
 }
 
 
