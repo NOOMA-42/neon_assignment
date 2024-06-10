@@ -11,6 +11,18 @@
 
 #define ITERATIONS 10
 
+void print_array(int16_t *a, int16_t n) {
+    printf("[ ");
+    for (int16_t i = 0; i < n; i++) {
+        printf("%d ", a[i]);
+    }
+    printf("]\n");
+}
+
+/*  
+modular reduction of the integer a with respect to the modulus mod.
+It ensures that the result lies in the range (-mod/2, mod/2].
+*/
 static int16_t cmod(int32_t a, int16_t mod){
     int16_t t;
     t = a % mod;
@@ -76,8 +88,18 @@ int main(void){
     printf("poly_Rq_mul_small finished!\n");
 
 
-    
-    printf("fft unit test finished\n");
+    int16_t test1[] = {0, 1, 2, 3, 4, 5, 6, 7};
+    int16_t n1 = sizeof(test1) / sizeof(int16_t);
+    int16_t N_bit = 0;
+    for (int16_t temp = n1; temp > 1; temp >>= 1)
+        N_bit++;
+    printf("Before bit reversal: ");
+    print_array(test1, n1);
+    bit_reversal_reorder(test1, n1, N_bit);
+    printf("After bit reversal:  ");
+    print_array(test1, n1);
+
+    printf("\nFFT unit test finished\n");
 
 
     for(size_t i = 0; i < ITERATIONS; i++){

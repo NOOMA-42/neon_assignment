@@ -2,9 +2,13 @@
 #include <stdint.h>
 
 #include "params.h"
-
 #include "poly.h"
+#include <stdlib.h>
 
+/*  
+modular reduction of the integer a with respect to the modulus mod.
+It ensures that the result lies in the range (-mod/2, mod/2].
+*/
 static int16_t cmod(int32_t a, int16_t mod){
     int16_t t;
     t = a % mod;
@@ -46,6 +50,10 @@ void poly_Rq_mul_small(int16_t *h, const int16_t *f,const int8_t *g)
         h[i] = fg[i];
 }
 
+/*  
+modular exponentiation a^b mod m.
+square-and-multiply
+*/
 static int16_t modpow(int16_t a, int16_t b, int16_t m) {
     int16_t res = 1;
     while (b > 0) {
@@ -85,54 +93,87 @@ int16_t find_primitive_root(int16_t q) {
     return -1; // No primitive root found
 }
 
+/*  
+Cooley-Tukey
+It takes two complex numbers a and b, and a twiddle factor twiddle, 
+and computes a' = a + twiddle * b and b' = a - twiddle * b, 
+where a' and b' are the updated values of a and b, respectively.
+*/
 static void butterfly(int16_t *a, int16_t *b, int16_t twiddle, int16_t m) {
     int16_t t = cmod((int32_t)*b * twiddle, m);
     *b = cmod((int32_t)*a - t, m);
     *a = cmod((int32_t)*a + t, m);
 }
 
-static void fft(int16_t *a, int16_t n, int16_t m) {
-    int16_t j = 0;
-    for (int16_t i = 1; i < n; i++) {
-        int16_t bit = n >> 1;
-        for (; j >= bit; bit >>= 1) {
-            j -= bit;
-        }
-        j += bit;
-        if (i < j) {
+// Function to reverse the bits of a given index
+uint16_t bit_reverse(uint16_t num, int16_t len) {
+    uint16_t rev_num = 0;
+    for (int16_t i = 0; i < len; i++) {
+        rev_num = (rev_num << 1) | ((num >> i) & 1);
+    }
+    return rev_num;
+}
+
+void bit_reversal_reorder(int16_t *a, int16_t n, int16_t N_bit) {
+    for (int16_t i = 0; i < n; i++) {
+        int16_t rev_i = bit_reverse(i, N_bit);
+        if (rev_i > i) {
             int16_t temp = a[i];
-            a[i] = a[j];
-            a[j] = temp;
+            a[i] = a[rev_i];
+            a[rev_i] = temp;
         }
     }
+}
 
-    for (int16_t len = 2; len <= n; len <<= 1) {
+static void fft(int16_t *a, int16_t n, int16_t m) {
+    int16_t N_bit = 0;
+    for (int16_t temp = n; temp > 0; temp >>= 1)
+        N_bit++;
+    N_bit--;
+
+    bit_reversal_reorder(a, n, N_bit);
+
+    // Cooley-Tukey FFT
+    for (int16_t i = 0; i < N_bit; i++) {
+        int16_t points1[n / 2];
+        int16_t points2[n / 2];
+        int16_t len = 1 << (i + 1);
         int16_t half_len = len >> 1;
         int16_t twiddle = modpow(NTRUP_ROOT, NTRUP_Q / len, NTRUP_Q);
-        for (int16_t i = 0; i < n; i += len) {
-            int16_t t = 1;
-            for (int16_t j = 0; j < half_len; j++) {
-                butterfly(&a[i + j], &a[i + j + half_len], t, m);
-                t = cmod((int32_t)t * twiddle, m);
-            }
+
+        for (int16_t j = 0; j < n / 2; j++) {
+            int16_t shift_bits = N_bit - i;
+            int16_t P = (j >> shift_bits) << shift_bits;
+            int16_t w_P = modpow(twiddle, P, NTRUP_Q);
+            int16_t even = a[j];
+            int16_t odd = a[j + half_len] * w_P;
+            points1[j] = cmod(even + odd, m);
+            points2[j] = cmod(even - odd, m);
+        }
+
+        int16_t k = 0;
+        for (int16_t j = 0; j < n / 2; j++) {
+            a[k++] = points1[j];
+            a[k++] = points2[j];
         }
     }
 }
 
 static void ifft(int16_t *a, int16_t n, int16_t m) {
     int16_t inv_n = modpow(n, NTRUP_Q - 2, NTRUP_Q);
+    int16_t inv_w = modpow(NTRUP_ROOT, NTRUP_Q - 1, NTRUP_Q);
+
     fft(a, n, m);
+
     for (int16_t i = 0; i < n; i++) {
+        a[i] = cmod((int32_t)a[i] * inv_w, m);
         a[i] = cmod((int32_t)a[i] * inv_n, m);
     }
-    for (int16_t i = 0; i < n / 2; i++) {
-        int16_t temp = a[i];
-        a[i] = a[n - i];
-        a[n - i] = temp;
-    }
+
+    bit_reversal_reorder(a, n, n / 2);
 }
 
-void fft_poly_mul(int16_t *des, const int16_t *src1, const int8_t *src2) {
+void fft_poly_mul(int16_t des[NTRUP_P], const int16_t src1[NTRUP_P], const int8_t src2[NTRUP_P]) {
     int16_t n = NTRUP_P;
     int16_t m = NTRUP_Q;
 
@@ -147,7 +188,7 @@ void fft_poly_mul(int16_t *des, const int16_t *src1, const int8_t *src2) {
         a[i] = 0;
         b[i] = 0;
     }
-    printf("test\n");
+
     fft(a, 2 * n, m);
     fft(b, 2 * n, m);
 
@@ -164,27 +205,3 @@ void fft_poly_mul(int16_t *des, const int16_t *src1, const int8_t *src2) {
     free(a);
     free(b);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -3,7 +3,7 @@
 
 CFLAGS += -g -Wall -Wextra -Wpedantic -Wmissing-prototypes -Wredundant-decls \
 	-Wshadow -Wno-unused-result \
-	-mtune=native -mcpu=native -O3
+	-mtune=native -mcpu=native #-O3
 
 
 CC ?= gcc
